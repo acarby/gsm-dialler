@@ -1,0 +1,16 @@
+[Unit]
+Description=GPIO Trigger Monitor for Fire Alarm
+After=multi-user.target modem-power.service
+Requires=modem-power.service
+
+[Service]
+ExecStart=/usr/bin/python3 /var/www/html/gpio_trigger.py
+Restart=always
+RestartSec=10
+User=pi
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+

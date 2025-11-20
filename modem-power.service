@@ -1,0 +1,11 @@
+[Unit]
+Description=Power on GSM modem via GPIO
+After=multi-user.target
+
+[Service]
+ExecStart=/usr/bin/python3 /usr/local/bin/power_on_modem.py
+Restart=on-failure
+User=pi
+
+[Install]
+WantedBy=multi-user.target

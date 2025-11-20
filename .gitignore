@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Data files (user-specific)
+gsmdialler-data/
+*.log
+*.txt
+!README.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.cursor-server/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*.backup
+/tmp/
+
+# Package files
+*.tar.gz
+deploy/package/
+
+# Sensitive data
+*secret*
+*password*
+.env
+
+# Logs
+*.log
+log.txt
+
