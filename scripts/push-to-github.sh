@@ -82,15 +82,35 @@ if [[ "$response" =~ ^[Yy]$ ]]; then
     
     echo -e "${GREEN}Pushing to origin/$branch...${NC}"
     
+    # Check if authentication is configured
+    if ! git ls-remote origin > /dev/null 2>&1; then
+        echo -e "${YELLOW}⚠️  Authentication issue detected.${NC}"
+        echo "Would you like to setup GitHub token? (y/n)"
+        read -r setup_token
+        if [[ "$setup_token" =~ ^[Yy]$ ]]; then
+            ./scripts/setup-github-token.sh
+        else
+            echo "Please setup authentication manually or run: ./scripts/setup-github-token.sh"
+            exit 1
+        fi
+    fi
+    
     # Push to GitHub
     if git push -u origin "$branch"; then
         echo ""
         echo -e "${GREEN}✅ Successfully pushed to GitHub!${NC}"
         echo ""
         echo "View your repository:"
-        git remote get-url origin | sed 's/\.git$//'
+        git remote get-url origin | sed 's/\.git$//' | sed 's|https://||' | sed 's|git@github.com:||'
     else
-        echo -e "${RED}❌ Push failed. Check your credentials and network connection.${NC}"
+        echo -e "${RED}❌ Push failed.${NC}"
+        echo ""
+        echo "Possible issues:"
+        echo "  - Token expired or invalid"
+        echo "  - Network connection problem"
+        echo "  - Repository permissions"
+        echo ""
+        echo "Try running: ./scripts/setup-github-token.sh"
         exit 1
     fi
 else
