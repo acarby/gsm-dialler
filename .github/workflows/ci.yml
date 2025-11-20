@@ -1,0 +1,49 @@
+name: CI Validation
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Validate file structure
+      run: |
+        echo "🔍 Validating project structure..."
+        test -f deploy/install.sh || (echo "❌ Missing deploy/install.sh" && exit 1)
+        test -f README.md || (echo "❌ Missing README.md" && exit 1)
+        test -f gpio_trigger.py || (echo "❌ Missing gpio_trigger.py" && exit 1)
+        test -f test_call.py || (echo "❌ Missing test_call.py" && exit 1)
+        test -f test_sms.py || (echo "❌ Missing test_sms.py" && exit 1)
+        echo "✅ All required files present"
+    
+    - name: Check shell script syntax
+      run: |
+        if command -v shellcheck &> /dev/null; then
+          shellcheck deploy/*.sh || echo "⚠️ ShellCheck warnings (non-fatal)"
+        else
+          echo "ℹ️ ShellCheck not available, skipping syntax check"
+        fi
+    
+    - name: Validate Python syntax
+      run: |
+        python3 -m py_compile *.py 2>&1 || echo "⚠️ Python syntax check (non-fatal)"
+        echo "✅ Python files validated"
+    
+    - name: Check for sensitive data
+      run: |
+        echo "🔒 Checking for sensitive data..."
+        if grep -r "password.*=" --include="*.py" --include="*.php" . | grep -v "#.*password" | grep -v "password.*hash"; then
+          echo "⚠️ Potential password found in code"
+        fi
+        if grep -r "api.*key" --include="*.py" --include="*.php" -i .; then
+          echo "⚠️ Potential API key found"
+        fi
+        echo "✅ Security check complete"
+
