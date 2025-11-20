@@ -1,0 +1,22 @@
+name: Deployment Check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Validate shell scripts
+      run: |
+        shellcheck deploy/*.sh || true
+    - name: Check file structure
+      run: |
+        test -f deploy/install.sh || exit 1
+        test -f README.md || exit 1
+        echo "✅ File structure valid"
+
