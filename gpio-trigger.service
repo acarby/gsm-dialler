@@ -8,6 +8,7 @@ ExecStart=/usr/bin/python3 /var/www/html/gpio_trigger.py
 Restart=always
 RestartSec=10
 User=pi
+WorkingDirectory=/home/pi
 StandardOutput=journal
 StandardError=journal
 

@@ -1,7 +1,29 @@
 <?php
 session_start();
+
+// Handle log download FIRST - before any other processing
+if (isset($_GET['action']) && $_GET['action'] === 'download_log') {
+  // Check if user is logged in
+  if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+    header('Location: /login');
+    exit;
+  }
+  
+  $log_file = '/var/www/gsmdialler-data/log.txt';
+  if (file_exists($log_file)) {
+    header('Content-Type: text/plain');
+    header('Content-Disposition: attachment; filename="gsm_dialler_log_' . date('Y-m-d_His') . '.txt"');
+    header('Content-Length: ' . filesize($log_file));
+    readfile($log_file);
+    exit;
+  } else {
+    header("Location: index.php?error=log_not_found");
+    exit;
+  }
+}
+
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
-  header('Location: login.php');
+  header('Location: /login');
   exit;
 }
 
@@ -30,18 +52,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
   }
   
-  // Handle log entry requests
-  if (isset($_POST['action']) && $_POST['action'] === 'log') {
-    $log_message = isset($_POST['message']) ? $_POST['message'] : '';
-    if ($log_message) {
-      $timestamp = date('Y-m-d H:i:s');
-      file_put_contents($log_file, "[$timestamp] $log_message\n", FILE_APPEND);
-      echo json_encode(["status" => "success"]);
-    } else {
-      echo json_encode(["status" => "error", "error" => "No message provided"]);
-    }
-    exit;
-  }
 }
 ?>
 <!DOCTYPE html>
@@ -271,6 +281,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     background-color: #f0f0f0;
     color: #000;
   }
+  
+  /* GPIO Status Styles */
+  .gpio-status-box {
+    padding: 1.5rem;
+    border-radius: 12px;
+    text-align: center;
+    border: 2px solid;
+    transition: all 0.3s ease;
+  }
+  .gpio-status-box.normal {
+    background-color: #d1e7dd;
+    border-color: #198754;
+    color: #0f5132;
+  }
+  .gpio-status-box.alarm {
+    background-color: #f8d7da;
+    border-color: #dc3545;
+    color: #842029;
+    animation: pulse-alarm 2s infinite;
+  }
+  @keyframes pulse-alarm {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+  }
+  .gpio-status-icon {
+    font-size: 3rem;
+    margin-bottom: 0.5rem;
+  }
+  .gpio-status-text {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+  .gpio-status-details {
+    font-size: 0.9rem;
+    color: #666;
+    margin-top: 0.5rem;
+  }
+  .gpio-status-error {
+    padding: 1rem;
+    background-color: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 8px;
+    color: #856404;
+    text-align: center;
+  }
   </style>
 </head>
 <body>
@@ -278,7 +334,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <div class="container">
   <div class="header">
     <h3>📞 GSM Dialler Dashboard</h3>
-    <a href="logout.php" class="btn btn-outline-dark btn-sm">Logout</a>
+    <div>
+      <a href="/reboot" class="btn btn-outline-warning btn-sm me-2">🔄 Reboot</a>
+      <a href="/logout" class="btn btn-outline-dark btn-sm">Logout</a>
+    </div>
   </div>
 
   <?php if (isset($_GET['success'])): ?>
@@ -306,10 +365,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
   </form>
 
+  <!-- GPIO Status Card -->
+  <div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <h6 class="mb-0 fw-medium">🔥 Fire Alarm Panel Status</h6>
+      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="refreshGPIOStatus(); return false;" id="btn-refresh-gpio">🔄 Refresh</button>
+    </div>
+    <div id="gpio-status-container">
+      <div class="d-flex align-items-center justify-content-center" style="min-height: 80px;">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <span class="ms-3">Loading GPIO status...</span>
+      </div>
+    </div>
+  </div>
+
   <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
       <h6 class="mb-0 fw-medium">📑 Log</h6>
-      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="refreshLog()">🔄 Refresh</button>
+      <div>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="refreshLog()">🔄 Refresh</button>
+        <button type="button" class="btn btn-sm btn-outline-primary" onclick="downloadLog()">📥 Download</button>
+        <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearLog()" id="btn-clear-log">🗑️ Clear</button>
+      </div>
     </div>
     <pre id="log-content"><?= htmlspecialchars($log_contents) ?></pre>
   </div>
@@ -389,7 +468,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     formData.append('action', 'log');
     formData.append('message', message);
     
-    fetch('index.php', {
+    fetch('log_actions.php', {
       method: 'POST',
       body: formData
     }).catch(err => console.error('Log error:', err));
@@ -659,6 +738,139 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Reload the page to get updated log
     window.location.reload();
   }
+  
+  function downloadLog() {
+    // Download log file - create a temporary link to trigger download
+    const link = document.createElement('a');
+    link.href = 'index.php?action=download_log';
+    link.download = 'gsm_dialler_log_' + new Date().toISOString().slice(0,19).replace(/:/g, '-') + '.txt';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+  
+  function clearLog() {
+    if (!confirm('Are you sure you want to clear the log? This action cannot be undone.')) {
+      return;
+    }
+    
+    const btn = document.getElementById('btn-clear-log');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ Clearing...';
+    
+    const formData = new FormData();
+    formData.append('action', 'clear_log');
+    
+    fetch('log_actions.php', {
+      method: 'POST',
+      body: formData
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          // Refresh the log display
+          refreshLog();
+        } else {
+          alert('Error clearing log: ' + (data.error || 'Unknown error'));
+          btn.disabled = false;
+          btn.textContent = originalText;
+        }
+      })
+      .catch(err => {
+        alert('Error clearing log: ' + err.message);
+        btn.disabled = false;
+        btn.textContent = originalText;
+      });
+  }
+  
+  function updateGPIOStatus() {
+    fetch('gpio_status.php')
+      .then(res => res.json())
+      .then(data => {
+        const container = document.getElementById('gpio-status-container');
+        
+        if (data.status === 'error') {
+          container.innerHTML = `
+            <div class="gpio-status-error">
+              <strong>⚠️ Error reading GPIO status</strong><br>
+              <small>${data.error || 'Unknown error'}</small>
+            </div>
+          `;
+          return;
+        }
+        
+        const isAlarm = data.is_alarm;
+        const statusClass = isAlarm ? 'alarm' : 'normal';
+        const statusIcon = isAlarm ? '🔥' : '✅';
+        const statusText = data.status_text;
+        const stateText = `GPIO${data.gpio_pin}: ${data.state} (${data.value})`;
+        
+        container.innerHTML = `
+          <div class="gpio-status-box ${statusClass}">
+            <div class="gpio-status-icon">${statusIcon}</div>
+            <div class="gpio-status-text">${statusText}</div>
+            <div class="gpio-status-details">
+              ${stateText}<br>
+              <small>Last updated: ${new Date().toLocaleTimeString()}</small>
+            </div>
+          </div>
+        `;
+      })
+      .catch(err => {
+        const container = document.getElementById('gpio-status-container');
+        container.innerHTML = `
+          <div class="gpio-status-error">
+            <strong>⚠️ Failed to fetch GPIO status</strong><br>
+            <small>${err.message}</small>
+          </div>
+        `;
+      });
+  }
+  
+  function refreshGPIOStatus() {
+    try {
+      // Show loading state
+      const container = document.getElementById('gpio-status-container');
+      if (!container) {
+        console.error('GPIO status container not found');
+        return;
+      }
+      
+      container.innerHTML = `
+        <div class="d-flex align-items-center justify-content-center" style="min-height: 80px;">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <span class="ms-3">Refreshing...</span>
+        </div>
+      `;
+      
+      // Update the status
+      updateGPIOStatus();
+    } catch (err) {
+      console.error('Error in refreshGPIOStatus:', err);
+      alert('Error refreshing GPIO status: ' + err.message);
+    }
+    return false;
+  }
+  
+  // Also add event listener as backup
+  document.addEventListener('DOMContentLoaded', function() {
+    const btn = document.getElementById('btn-refresh-gpio');
+    if (btn) {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        refreshGPIOStatus();
+      });
+    }
+  });
+  
+  // Update GPIO status on page load
+  updateGPIOStatus();
+  
+  // Auto-refresh GPIO status every 2 seconds
+  setInterval(updateGPIOStatus, 2000);
   
   // Auto-refresh log every 5 seconds
   setInterval(function() {

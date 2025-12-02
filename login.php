@@ -6,7 +6,7 @@ $correct_pass = 'dialler123';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($_POST['username'] === $correct_user && $_POST['password'] === $correct_pass) {
         $_SESSION['logged_in'] = true;
-        header("Location: index.php");
+        header("Location: /");
         exit;
     } else {
         $error = "Invalid login details.";

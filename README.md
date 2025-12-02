@@ -1,148 +1,131 @@
 # GSM Dialler System
 
-A Raspberry Pi-based fire alarm notification system that automatically makes phone calls and sends SMS messages when a fire alarm is triggered via GPIO.
+## 🔐 Login Credentials
 
-## 🔥 Features
+**URL:** http://gsmdialler.local/login.php
 
-- **GPIO Monitoring**: Monitors GPIO pin 17 for fire alarm triggers
-- **Automatic Calls**: Dials all numbers in call list when alarm is triggered
-- **SMS Notifications**: Sends SMS messages to all contacts
-- **Web Interface**: Easy-to-use dashboard for managing contacts and messages
-- **Systemd Integration**: Runs automatically on boot
-- **Comprehensive Logging**: All events logged with timestamps
+- **Username:** `admin`
+- **Password:** `dialler123`
 
-## 📋 Requirements
+---
 
-- Raspberry Pi (any model with GPIO)
-- GSM Modem connected to `/dev/serial0`
-- GPIO 17 connected to fire alarm relay
-- Raspberry Pi OS (Debian-based)
+## 📁 File Structure
 
-## 🚀 Quick Start
+### Web Interface Files
+- `index.php` - Main dashboard for managing call lists and messages
+- `login.php` - Login page (contains credentials)
+- `logout.php` - Logout handler
+- `auth.php` - Authentication check
 
-### Installation
+### Core Scripts
+- `gpio_trigger.py` - Monitors GPIO 17 for alarm signals and triggers calls
+- `test_call.py` - Main GSM dialing script that reads numbers and makes calls
+- `test_sms.py` - SMS sending script
+- `power_on_modem.py` - Powers on GSM modem via GPIO 17
+- `test_gpio.py` - **Test script to verify GPIO connection to fire panel**
 
-1. **Clone the repository:**
-   ```bash
-   git clone <your-repo-url> gsm-dialler
-   cd gsm-dialler
-   ```
+### Data Directory
+- `gsmdialler-data/` - Contains:
+  - `call_list.txt` - List of phone numbers to dial (one per line)
+  - `message.txt` - Message to send
+  - `log.txt` - System logs
 
-2. **Run the installation script:**
-   ```bash
-   cd deploy
-   sudo bash install.sh
-   ```
+### System Service
+- `modem-power.service` - Systemd service file for modem power management
 
-3. **Access the web interface:**
-   - Open browser to: `http://raspberrypi.local/login.php`
-   - Username: `admin`
-   - Password: `dialler123`
+---
 
-4. **Configure:**
-   - Add phone numbers to the call list
-   - Set your SMS message
-   - Test the system
-
-For detailed deployment instructions, see [deploy/README_DEPLOYMENT.md](deploy/README_DEPLOYMENT.md)
-
-## 📁 Project Structure
-
-```
-gsm-dialler/
-├── deploy/                 # Deployment scripts and documentation
-│   ├── install.sh         # Automated installation script
-│   ├── create-package.sh  # Package creation script
-│   └── README_DEPLOYMENT.md
-├── *.php                  # Web interface files
-├── *.py                   # Python scripts
-├── *.service              # Systemd service files
-└── README.md             # This file
-```
-
-## 🔧 Configuration
-
-### GPIO Pin
-Default: GPIO 17. To change, edit `gpio_trigger.py`:
-```python
-GPIO_PIN = 17  # Change to your desired pin
-```
+## 🔧 System Configuration
 
 ### Serial Port
-Default: `/dev/serial0`. To change, edit the Python scripts:
-```python
-PORT = "/dev/serial0"  # Change to your port
+- **Port:** `/dev/serial0`
+- **Baud Rate:** 115200
+
+### GPIO Configuration
+- **GPIO Pin 17:** Used for:
+  - Powering on the modem (output)
+  - Monitoring alarm signals (input)
+
+**Fire Panel Wiring:**
+- GPIO17 (Pin 11) → Eurofire NO (Normally Open)
+- GND (Pin 9/14) → Eurofire COM (Common)
+- **Pull-up enabled:** Normal = HIGH, Alarm = LOW
+
+### Active Services
+- `modem-power.service` - Powers on modem at boot
+- `ModemManager` - Manages GSM modem
+- `gpio_trigger.py` - Running as background process monitoring GPIO 17
+
+---
+
+## 🧪 Testing GPIO Connection
+
+To test if the GPIO connection to the fire alarm panel is working:
+
+```bash
+python3 /home/pi/gsm-dialler/test_gpio.py
 ```
 
-### Web Interface Password
-Edit `login.php` and update the password hash.
+Or from the web directory:
+```bash
+python3 /var/www/html/test_gpio.py
+```
+
+This script will:
+- Show the current GPIO17 state
+- Monitor for state changes
+- Help verify the wiring is correct
+
+**Expected behavior:**
+- **Normal state:** GPIO17 = HIGH (relay open)
+- **Alarm state:** GPIO17 = LOW (relay closed, connected to GND)
+
+---
 
 ## 📞 How It Works
 
-1. **GPIO Monitoring**: `gpio_trigger.py` continuously monitors GPIO 17
-2. **Alarm Detection**: When GPIO goes HIGH, alarm is triggered
-3. **Call List**: Reads phone numbers from `/var/www/gsmdialler-data/call_list.txt`
-4. **Calls**: `test_call.py` dials each number sequentially
-5. **SMS**: `test_sms.py` sends SMS to each number
-6. **Logging**: All events logged to `/var/www/gsmdialler-data/log.txt`
+1. **Alarm Detection:** `gpio_trigger.py` monitors GPIO 17 for LOW signal (relay closed)
+2. **Call Trigger:** When alarm detected, it runs `test_call.py` and `test_sms.py`
+3. **Dialing:** Script reads numbers from `gsmdialler-data/call_list.txt` and dials each one
+4. **SMS:** Script sends SMS to all numbers in call list with message from `gsmdialler-data/message.txt`
+5. **Call Management:** Uses AT commands to dial, monitor, and hang up calls
 
-## 🛠️ Maintenance
+---
 
-### View Logs
+## 🚀 Usage
+
+### Web Interface
+1. Navigate to http://gsmdialler.local/login.php
+2. Login with credentials above
+3. Manage call list and messages
+4. Test calls and SMS from dashboard
+
+### Manual Call Test
 ```bash
-tail -f /var/www/gsmdialler-data/log.txt
+python3 /var/www/html/test_call.py
 ```
 
-### Check Service Status
+### Manual SMS Test
 ```bash
-sudo systemctl status gpio-trigger.service
-sudo systemctl status modem-power.service
+python3 /var/www/html/test_sms.py
 ```
 
-### Restart Services
+### Test GPIO Connection
 ```bash
-sudo systemctl restart gpio-trigger.service
+python3 /home/pi/gsm-dialler/test_gpio.py
 ```
 
-### Update System
+### Check GPIO Monitor
 ```bash
-cd ~/gsm-dialler
-git pull
-sudo bash deploy/install.sh
+python3 /var/www/html/gpio_trigger.py
 ```
 
-## 📝 File Locations
+---
 
-- **Web Interface**: `/var/www/html/`
-- **Python Scripts**: `/var/www/html/*.py`
-- **Data Directory**: `/var/www/gsmdialler-data/`
-- **Service Files**: `/etc/systemd/system/`
-- **Logs**: `/var/www/gsmdialler-data/log.txt`
+## 📝 Notes
 
-## 🔐 Security Notes
-
-- Change default password in `login.php` before production use
-- Consider using HTTPS for web interface
-- Restrict network access if possible
-- Regularly update system packages
-
-## 🐛 Troubleshooting
-
-See [deploy/README_DEPLOYMENT.md](deploy/README_DEPLOYMENT.md) for detailed troubleshooting guide.
-
-Common issues:
-- **Service won't start**: Check logs with `sudo journalctl -u gpio-trigger.service`
-- **Serial port issues**: Ensure user is in `dialout` group
-- **GPIO permission errors**: Ensure user is in `gpio` group
-
-## 📄 License
-
-[Add your license here]
-
-## 👥 Contributing
-
-[Add contribution guidelines if applicable]
-
-## 📧 Support
-
-For issues or questions, check the log file or service logs.
+- Original files are still in `/var/www/html/` and `/var/www/gsmdialler-data/`
+- This folder is a copy for easy access and backup
+- To modify the system, edit files in `/var/www/html/` (requires sudo)
+- Modem power script logs to `/home/pi/modem_boot.log`
+- GPIO trigger uses pull-up resistor: LOW = alarm, HIGH = normal
